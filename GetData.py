@@ -5,6 +5,7 @@ import numpy.lib.recfunctions as recfunctions
 import os
 import sys
 import esutil
+import DBfunctions
 
 
 if __name__=='__main__': 
