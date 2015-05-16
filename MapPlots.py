@@ -52,8 +52,30 @@ def PointMap(data, band='i', x='alphawin_j2000', y='deltawin_j2000', ax=None, pl
         ax.set_title(title)
     return len(data[keep])
 
+
 def DistributionPlot(data, col, bins, plotkwargs={}):
-    center = 1
+    hist, bins = np.histogram(data[col], bins)
+    dbin = np.diff(bins)
+    n = hist / (dbin * np.sum(hist))
+    c = (bins[0:-1]+bins[1:])/2.0
+    return n, c
+
+
+def PlotBD(sim, des, col, bins, ax, band='i', plotkwargs={}, title=None):
+    col = '{0}_{1}'.format(col,band)
+    plotkwargs['color'] = 'red'
+    s, c = DistributionPlot(sim, col, bins=bins)
+    ax.plot(c, np.log10(s), label='Balrog', **plotkwargs)
+
+    plotkwargs['color'] = 'blue'
+    d, c = DistributionPlot(des, col, bins=bins)
+    ax.plot(c, np.log10(d), label='DES', **plotkwargs)
+
+    ax.legend(loc='best')
+    ax.set_xlabel(col)
+    ax.set_ylabel(r'\log P')
+    if title is not None:
+        ax.set_title(title)
 
 
 
@@ -63,10 +85,20 @@ if __name__=='__main__':
     truth, sim, nosim, des = GetData(version='v3-combined', band=band, method='FITS', catalogdir=os.environ['DBFITS'])
     #truth, sim, nosim, des = GetData(version='sva1v3_3', band=band, method='FITS')
 
+    '''
     fig, axarr = plt.subplots(1,2, figsize=(12,6))
     npoints = PointMap(sim, band=band, downfactor=100, plotkwargs={'lw':0, 's':0.2}, ax=axarr[0], title='Balrog')
     npoints = PointMap(des, band=band, downsize=npoints, plotkwargs={'lw':0, 's':0.2}, ax=axarr[1], title='DES')
-    #plt.show()
     fig.suptitle('Raw')
     plt.subplots_adjust(top=0.85)
-    plt.savefig('plots/simple-map.png')
+    #plt.savefig('plots/simple-map.png')
+    plt.show()
+    '''
+
+    fig, axarr = plt.subplots(1,3, figsize=(12,6))
+    bins=np.arange(20,26,0.1)
+    PlotBD(sim, des, 'mag_auto', bins, axarr[0], band=band, plotkwargs={}, title='All')
+
+    print sim.dtype, des.dtype
+
+    plt.show()
