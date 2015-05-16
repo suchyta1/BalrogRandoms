@@ -31,15 +31,12 @@ def GetData(version='v3-combined', band='i', method='FITS', catalogdir=os.path.j
 
 
 def PointMap(data, band='i', x='alphawin_j2000', y='deltawin_j2000', ax=None, plotkwargs={}, downfactor=None, downsize=None, title=None):
-    print 'a'
     x = '{0}_{1}'.format(x,band)
     y = '{0}_{1}'.format(y,band)
   
     if downfactor is not None:
         size = len(data) / downfactor
-        print 'b'
         keep = np.random.choice(len(data), size=size, replace=False)
-        print 'c'
     elif downsize is not None:
         keep = np.random.choice(len(data), size=downsize, replace=False)
     else:
@@ -48,7 +45,6 @@ def PointMap(data, band='i', x='alphawin_j2000', y='deltawin_j2000', ax=None, pl
     if ax is None:
         fig, ax = plt.subplots()
 
-    print len(data[x][keep])
     ax.scatter(data[x][keep],data[y][keep], **plotkwargs)
     ax.set_xlabel(x)
     ax.set_ylabel(y)
@@ -64,7 +60,7 @@ def DistributionPlot(data, col, bins, plotkwargs={}):
 if __name__=='__main__': 
 
     band = 'i' 
-    truth, sim, nosim, des = GetData(version='v3-combined', band=band, method='FITS')
+    truth, sim, nosim, des = GetData(version='v3-combined', band=band, method='FITS', catalogdir=os.environ['DBFITS'])
     #truth, sim, nosim, des = GetData(version='sva1v3_3', band=band, method='FITS')
 
     fig, axarr = plt.subplots(1,2, figsize=(12,6))
