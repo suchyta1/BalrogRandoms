@@ -30,7 +30,7 @@ def GetData(version='v3-combined', band='i', method='FITS', catalogdir=os.path.j
     return cats
 
 
-def PointMap(data, band='i', x='alphawin_j2000', y='deltawin_j2000', ax=None, plotkwargs={}, downfactor=None, downsize=None):
+def PointMap(data, band='i', x='alphawin_j2000', y='deltawin_j2000', ax=None, plotkwargs={}, downfactor=None, downsize=None, title=None):
     x = '{0}_{1}'.format(x,band)
     y = '{0}_{1}'.format(y,band)
    
@@ -48,6 +48,10 @@ def PointMap(data, band='i', x='alphawin_j2000', y='deltawin_j2000', ax=None, pl
         fig, ax = plt.subplots()
 
     ax.scatter(data[x][keep],data[y][keep], **plotkwargs)
+    ax.set_xlabel(x)
+    ax.set_ylabel(y)
+    if title is not None:
+        ax.set_title(title)
     return len(data[keep])
 
 
@@ -59,6 +63,6 @@ if __name__=='__main__':
     #truth, sim, nosim, des = GetData(version='sva1v3_3', band=band, method='FITS')
 
     fig, axarr = plt.subplots(1,2, figsize=(12,6))
-    npoints = PointMap(sim, band=band, downfactor=100, plotkwargs={'lw':0, 's':0.2}, ax=axarr[0])
-    npoints = PointMap(des, band=band, downsize=npoints, plotkwargs={'lw':0, 's':0.2}, ax=axarr[1])
+    npoints = PointMap(sim, band=band, downfactor=100, plotkwargs={'lw':0, 's':0.2}, ax=axarr[0], title='Balrog')
+    npoints = PointMap(des, band=band, downsize=npoints, plotkwargs={'lw':0, 's':0.2}, ax=axarr[1], title='DES')
     plt.show()
