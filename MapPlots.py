@@ -31,28 +31,33 @@ def GetData(version='v3-combined', band='i', method='FITS', catalogdir=os.path.j
 
 
 def PointMap(data, band='i', x='alphawin_j2000', y='deltawin_j2000', ax=None, plotkwargs={}, downfactor=None, downsize=None, title=None):
+    print 'a'
     x = '{0}_{1}'.format(x,band)
     y = '{0}_{1}'.format(y,band)
-   
+  
     if downfactor is not None:
         size = len(data) / downfactor
+        print 'b'
         keep = np.random.choice(len(data), size=size, replace=False)
+        print 'c'
     elif downsize is not None:
         keep = np.random.choice(len(data), size=downsize, replace=False)
     else:
         keep = np.ones(len(data), dtype=np._bool)
 
-    print len(data[keep])
-    
     if ax is None:
         fig, ax = plt.subplots()
 
+    print len(data[x][keep])
     ax.scatter(data[x][keep],data[y][keep], **plotkwargs)
     ax.set_xlabel(x)
     ax.set_ylabel(y)
     if title is not None:
         ax.set_title(title)
     return len(data[keep])
+
+def DistributionPlot(data, col, bins, plotkwargs={}):
+    center = 1
 
 
 
@@ -65,4 +70,7 @@ if __name__=='__main__':
     fig, axarr = plt.subplots(1,2, figsize=(12,6))
     npoints = PointMap(sim, band=band, downfactor=100, plotkwargs={'lw':0, 's':0.2}, ax=axarr[0], title='Balrog')
     npoints = PointMap(des, band=band, downsize=npoints, plotkwargs={'lw':0, 's':0.2}, ax=axarr[1], title='DES')
-    plt.show()
+    #plt.show()
+    fig.suptitle('Raw')
+    plt.subplots_adjust(top=0.85)
+    plt.savefig('plots/simple-map.png')
