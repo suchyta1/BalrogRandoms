@@ -6,27 +6,24 @@ import os
 import sys
 import esutil
 import DBfunctions
+import query
+from mpi4py import MPI
 
 
 if __name__=='__main__': 
-    version = 'sva1v3'
-    bands = ['g','r','i','z','Y']
-    outdir = 'Data'
+
+    band = sys.argv[1]
+    DBselect = query.Select()
+    DBselect['bands'] = [band]
    
-
-    DBselect = {'table': version,
-                'des': 'sva1_coadd_objects',
-                'bands': bands,
-                'truth': ['balrog_index', 'mag', 'ra', 'dec', 'objtype' ],
-                'sim': ['mag_auto', 'flux_auto', 'fluxerr_auto', 'flags', 'spread_model', 'spreaderr_model', 'class_star', 'mag_psf', 'alphawin_j2000', 'deltawin_j2000', 'flux_radius', 'kron_radius', 'ellipticity', 'mag_aper_4', 'fwhmpsf_image', 'fwhmpsf_world']
-               }
-
-    truth, sim, nosim, des = DBfunctions.GetAllViaTileQuery(select)
+    truth, sim, nosim, des = DBfunctions.GetAllViaTileQuery(DBselect)
     if MPI.COMM_WORLD.Get_rank()==0:
-        outdir = os.path.join(outdir, version)
+        dir = os.path.join(DBselect['outdir'], DBselect['table'])
         if not os.path.exists(dir):
             os.makedirs(dir)
-        esutil.io.write(os.path.join(dir,'truth-%s.fits'%(band)), truth, clobber=True)
-        esutil.io.write(os.path.join(dir,'matched-%s.fits'%(band)), matched, clobber=True)
-        esutil.io.write(os.path.join(dir,'nosim-%s.fits'%(band)), nosim, clobber=True)
-        esutil.io.write(os.path.join(dir,'des-%s.fits'%(band)), des, clobber=True)
+        esutil.io.write(os.path.join(dir,'truth-{0}.fits'.format(band)), truth, clobber=True)
+        esutil.io.write(os.path.join(dir,'matched-{0}.fits'.format(band)), sim, clobber=True)
+        esutil.io.write(os.path.join(dir,'nosim-{0}.fits'.format(band)), nosim, clobber=True)
+
+        print len(des)
+        esutil.io.write(os.path.join(dir,'des-{0}.fits'.format(band)), des, clobber=True)

@@ -4,6 +4,7 @@ import numpy.lib.recfunctions as recfunctions
 import healpy as hp
 from mpi4py import MPI
 import mpifunctions
+import time
 
 
 def AngularDistance(r1, r2, d1, d2):
@@ -215,16 +216,83 @@ def GetBalrog(select, truthwhere='', simwhere=''):
     return [truth, sim, nosim]
 
 
-def GetDES(select, where=''):
+def GetDES(select, where='', auto='coadd_objects_id'):
+    t1 = time.time()
     cur = desdb.connect()
     ss = []
     for band in select['bands']:
         for sel in select['sim']:
-            ss.append('%s_%s' %(sel,band))
+            if sel!='number_sex':
+                ss.append('%s_%s' %(sel,band))
+        ss.append('%s as %s_%s'%(auto,auto,band))
     ss = ', '.join(ss)
     q = """SELECT %s FROM %s %s"""%(ss, select['des'], where)
     des = cur.quick(q, array=True)
+    print where, time.time()-t1
     return des
+
+
+def GetDESViaTileQuery(select, limit=None):
+    cur = desdb.connect()
+    arr = cur.quick('SELECT unique(tilename) from balrog_%s_truth_%s' %(select['table'],select['bands'][0]), array=True)
+    tiles = arr['tilename']
+    if limit!=None:
+        tiles = tiles[0:limit]
+    print len(tiles), 'tiles'
+
+    arr = []
+    for tile in tiles:
+        where = "where tilename='%s'"%(tile)
+        des = GetDES(select, where=where)
+        arr.append(des)
+   
+    print 'stacking'
+    for i in range(len(arr)):
+        if i==0:
+            out = arr[i]
+        else:
+            out = recfunctions.stack_arrays( (out, arr[i]), usemask=False)
+    return out
+
+
+def GetBalrogViaTileQuery(select, limit=None):
+    cur = desdb.connect()
+    if MPI.COMM_WORLD.Get_rank()==0:
+        arr = cur.quick('SELECT unique(tilename) from balrog_%s_truth_%s' %(select['table'],select['bands'][0]), array=True)
+        tiles = arr['tilename']
+        if limit!=None:
+            tiles = tiles[0:limit]
+        print len(tiles), 'tiles'
+    else:
+        tiles = None
+
+    tiles = mpifunctions.Scatter(tiles)
+    arr = []
+    for tile in tiles:
+        where = "where tilename='%s'"%(tile)
+        t = time.time()
+        truth, sim, nosim = GetBalrog(select, truthwhere=where, simwhere=where)
+        arr.append([truth, sim, nosim])
+        print where, time.time() - t
+    
+    arr = MPI.COMM_WORLD.gather(arr, root=0)
+    if MPI.COMM_WORLD.Get_rank()==0:
+        newarr = []
+        for i in range(len(arr)):
+            if len(arr[i])==0:
+                continue
+            
+            for j in range(len(arr[i])):
+                for k in range(len(arr[i][j])):
+                    if len(newarr) < len(arr[i][j]):
+                        newarr.append(arr[i][j][k])
+                    else:
+                        newarr[k] = recfunctions.stack_arrays( (newarr[k], arr[i][j][k]), usemask=False)
+
+    else:
+        newarr = [None]*3
+
+    return newarr
 
 
 def GetAllViaTileQuery(select, limit=None):
@@ -241,11 +309,13 @@ def GetAllViaTileQuery(select, limit=None):
     tiles = mpifunctions.Scatter(tiles)
     arr = []
     for tile in tiles:
+        t = time.time()
         where = "where tilename='%s'"%(tile)
         truth, sim, nosim = GetBalrog(select, truthwhere=where, simwhere=where)
         des = GetDES(select, where=where)
         arr.append([truth, sim, nosim, des])
-  
+        print where, time.time() - t
+    
     arr = MPI.COMM_WORLD.gather(arr, root=0)
     if MPI.COMM_WORLD.Get_rank()==0:
         newarr = []
@@ -264,5 +334,4 @@ def GetAllViaTileQuery(select, limit=None):
         newarr = [None]*4
 
     return newarr
-
 
