@@ -116,23 +116,50 @@ def GetBorisPlot(map, boris, cat, ra='alphawin_j2000_i', dec='deltawin_j2000_i',
     n = np.zeros(len(bins)-1) 
     relerr_n = np.zeros(len(bins)-1)
     v = (bins[1:]+bins[:-1])/2.0
+    range_x = np.empty(0)
+    range_y = np.empty(0)
+
     for i in range(len(bins)-1):
         cut = (newvalue > bins[i]) & (newvalue < bins[i+1])
         num = np.sum(cut)
-        nn = num / float( len(np.unique(hps[cut])) )
+        if num==0:
+            continue
+        u = np.unique(hps[cut])
+        nn = num / float(len(u))
         n[i] = nn / navg
         relerr_n[i] = np.sqrt(relerr_navg2 + 1.0/num) * n[i]
-        print np.sum(cut), relerr_navg2,  1.0/num, relerr_n[i]
 
-    return v,n,relerr_n
+        hc = hps[cut]
+        hcb = np.sort(u)
+        hcb = np.append(hcb, hcb[-1]+1)
+        hist, hcb = np.histogram(hc, bins=hcb)
+        nhist = hist/navg
+        range_x = np.append(range_x, [v[i]]*len(hist))
+        range_y = np.append(range_y, nhist)
+        #print range_x, range_y
+        #std = np.std(hist) / np.sqrt(len(hist))
+        std = np.std(nhist) / np.sqrt(len(hist))
+        #std = np.std(nhist)
+
+        '''
+        for uu in u:
+            ucut = (hc==u)
+            range_x.append(v[i])
+            range_y.append(np.sum(u))
+        '''
+
+    return v,n,relerr_n, range_x, range_y, std
 
 
-def Compare2Boris(sim, des, map, boris, title=None, bins=np.array([0.65, 0.75, 0.85, 0.95, 1.05, 1.15, 1.25, 1.35])):
+def Compare2Boris(sim, des, map, boris, title=None, bins=np.array([0.65, 0.75, 0.85, 0.95, 1.05, 1.15, 1.25, 1.35]), ra='alphawin_j2000_i', dec='deltawin_j2000_i'):
     fig, ax = plt.subplots()
-    vs, s, se = GetBorisPlot(map, boris, sim, ra='alphawin_j2000_i', dec='deltawin_j2000_i', bins=bins)
-    BorisPlot(vs, s, se, ax=ax, plotkwargs={'c':'red', 'label':'Balrog'})
-    vd, d, de = GetBorisPlot(map, boris, des, ra='alphawin_j2000_i', dec='deltawin_j2000_i', bins=bins)
-    BorisPlot(vd, d, de, ax=ax, plotkwargs={'c':'blue', 'label':'DES'})
+    vs, s, se, rs_x, rs_y, sstd = GetBorisPlot(map, boris, sim, bins=bins, ra=ra, dec=dec)
+    #BorisPlot(vs, s, se, rs_x, rs_y, ax=ax, plotkwargs={'c':'red', 'label':'Balrog'}, scatterkwargs={'color':'red', 's':0.5})
+    BorisPlot(vs, s, sstd, rs_x, rs_y, ax=ax, plotkwargs={'c':'red', 'label':'Balrog'}, scatterkwargs={'color':'red'})
+
+    vd, d, de, rd_x, rd_y, dstd = GetBorisPlot(map, boris, des, bins=bins, ra=ra, dec=dec)
+    #BorisPlot(vd, d, de, rd_x, rd_y, ax=ax, plotkwargs={'c':'blue', 'label':'DES'}, scatterkwargs={'color':'blue', 's':0.5})
+    BorisPlot(vd, d, dstd, rd_x, rd_y, ax=ax, plotkwargs={'c':'blue', 'label':'DES'}, scatterkwargs={'color':'blue', 's':0.5})
 
     ax.legend(loc='best')
     ax.set_ylabel(r'$n/\bar{n}$')
@@ -141,13 +168,13 @@ def Compare2Boris(sim, des, map, boris, title=None, bins=np.array([0.65, 0.75, 0
         ax.set_title(title)
 
 
-def BorisPlot(v,n,e, ax=None, title=None, plotkwargs={}):
+def BorisPlot(v,n,e, range_x,range_y, ax=None, title=None, plotkwargs={}, scatterkwargs={}):
 
     if ax is None:
         fig, ax = plt.subplots()
     
     ax.errorbar(v, n, yerr=e, **plotkwargs)
-    print e
+    #ax.scatter(range_x, range_y, **scatterkwargs)
     
     if title is not None:
         ax.set_title()
@@ -156,35 +183,49 @@ def BorisPlot(v,n,e, ax=None, title=None, plotkwargs={}):
 
 if __name__=='__main__': 
 
-    band = 'i' 
+    band = 'r' 
     truth, sim, nosim, des = GetData(version='v3-combined', band=band, method='FITS', catalogdir=os.environ['DBFITS'])
     #truth, sim, nosim, des = GetData(version='v3-combined', band=band, method='FITS')
     #truth, sim, nosim, des = GetData(version='sva1v3_3', band=band, method='FITS')
 
-    sim = sim[ (sim['mag_auto_i'] > 20) & (sim['mag_auto_i'] < 25) ]
-    des = des[ (des['mag_auto_i'] > 20) & (des['mag_auto_i'] < 25) ]
+    sim = sim[ (sim['mag_auto_%s'%(band)] > 20) & (sim['mag_auto_%s'%(band)] < 25) ]
+    des = des[ (des['mag_auto_%s'%(band)] > 20) & (des['mag_auto_%s'%(band)] < 25) ]
 
 
-    #file = 'nside4096_oversamp4/SVA1_IMAGE_SRC_band_i_nside4096_oversamp4_FWHM__mean.fits'
-    #t = 'PSF FWHM'
+    files = ['nside4096_oversamp4/SVA1_IMAGE_SRC_band_%s_nside4096_oversamp4_FWHM__mean.fits.gz'%(band),
+             'nside4096_oversamp4/SVA1_IMAGE_SRC_band_%s_nside4096_oversamp4_FWHM_coaddweights_mean.fits.gz'%(band),
+             'nside4096_oversamp4/SVA1_IMAGE_SRC_band_%s_nside4096_oversamp4_maglimit__.fits.gz'%(band),
+             'nside4096_oversamp4/SVA1_IMAGE_SRC_band_%s_nside4096_oversamp4_SKYBRITE__mean.fits.gz'%(band),
+             'nside4096_oversamp4/SVA1_IMAGE_SRC_band_%s_nside4096_oversamp4_SKYBRITE_coaddweights_mean.fits.gz'%(band),
+             'nside4096_oversamp4/SVA1_IMAGE_SRC_band_%s_nside4096_oversamp4_SKYSIGMA__mean.fits.gz'%(band),
+             'nside4096_oversamp4/SVA1_IMAGE_SRC_band_%s_nside4096_oversamp4_SKYSIGMA_coaddweights_mean.fits.gz'%(band),
+             'nside4096_oversamp4/SVA1_IMAGE_SRC_band_%s_nside4096_oversamp4_AIRMASS__mean.fits.gz'%(band),
+             'nside4096_oversamp4/SVA1_IMAGE_SRC_band_%s_nside4096_oversamp4_AIRMASS_coaddweights_mean.fits.gz'%(band)]
+    
+    ts = ['PSF FWHM (mean)',
+          'PSF FWHM (coadd weights)',
+          'Mag Limit',
+          'Sky Brightness (mean)',
+          'Sky Brightness (coadd weights)',
+          'Sky Sigma (mean)',
+          'Sky Sigma (coadd weights)',
+          'Airmass (mean)',
+          'Airmass (coadd weights)']
 
-    #file = 'nside4096_oversamp4/SVA1_IMAGE_SRC_band_i_nside4096_oversamp4_maglimit__.fits.gz'
-    #t = 'Mag Limit'
+    outdir = os.path.join('Plots',band)
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
 
-    #file = 'nside4096_oversamp4/SVA1_IMAGE_SRC_band_g_nside4096_oversamp4_SKYBRITE_coaddweights_mean.fits.gz'
-    #t = 'Sky Brightness'
+    for i in range(len(ts)):
+        print ts[i]
+        map = BorisAsMap(files[i])
+        boris = BorisNative(files[i])
 
-    #file = 'nside4096_oversamp4/SVA1_IMAGE_SRC_band_g_nside4096_oversamp4_SKYSIGMA_coaddweights_mean.fits.gz'
-    #t = 'Sky Sigma'
-
-    file = 'nside4096_oversamp4/SVA1_IMAGE_SRC_band_i_nside4096_oversamp4_AIRMASS__mean.fits.gz'
-    t = 'Airmass'
-
-    map = BorisAsMap(file)
-    boris = BorisNative(file)
-    #Compare2Boris(sim, des, map, boris, title=r'%s %s-band'%(t,band))
-    Compare2Boris(sim, des, map, boris, title=r'%s %s-band'%(t,band), bins=np.array([0.92, 0.94, 0.96, 0.98, 1.0, 1.02, 1.04]))
-    plt.savefig('plots/boris-%s-%s.png'%(t,band))
+        if (ts[i].upper().find('AIR')!=-1) or (ts[i].upper().find('LIMIT')!=-1):
+            Compare2Boris(sim, des, map, boris, title=r'%s %s-band'%(ts[i],band), bins=np.array([0.92, 0.94, 0.96, 0.98, 1.0, 1.02, 1.04]), ra='alphawin_j2000_%s'%(band), dec='deltawin_j2000_%s'%(band))
+        else:
+            Compare2Boris(sim, des, map, boris, title=r'%s %s-band'%(ts[i],band),ra='alphawin_j2000_%s'%(band), dec='deltawin_j2000_%s'%(band))
+        plt.savefig(os.path.join(outdir,'boris-%s-%s.png'%(ts[i],band)))
 
 
     '''
